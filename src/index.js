@@ -340,6 +340,8 @@ class Offline {
     // Passes the configuration object to the server
     this.server.connection(connectionOptions);
 
+    this.server.register(require('hapi-plugin-websocket'));
+
     // Enable CORS preflight response
     this.server.ext('onPreResponse', corsHeaders);
   }
@@ -457,6 +459,10 @@ class Offline {
           // maxBytes: Increase request size from 1MB default limit to 10MB.
           // Cf AWS API GW payload limits.
           routeConfig.payload = { parse: false, maxBytes: 1024 * 1024 * 10 };
+        }
+
+        if (routeMethod == 'POST') {
+          routeConfig.plugins = { websocket: true };
         }
 
         this.server.route({

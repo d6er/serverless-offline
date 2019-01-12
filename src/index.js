@@ -462,7 +462,25 @@ class Offline {
         }
 
         if (routeMethod == 'POST') {
-          routeConfig.plugins = { websocket: true };
+          routeConfig.plugins = {
+            websocket: {
+              connect: ({ ctx, wss, ws, req, peers }) => {
+                // ref: createLambdaProxyContext
+                const wsEvent = {
+                  headers: req.headers,
+                  path: req.url,
+                  requestContext: {
+                    eventType: 'CONNECT'
+                  },
+                  body: null,
+                  isOffline: true,
+                  ws: ws
+                }
+                const wsHandler = functionHelper.createHandler(funOptions, this.options);
+                wsHandler(wsEvent, {});
+              },
+            }
+          };
         }
 
         this.server.route({

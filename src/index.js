@@ -640,6 +640,11 @@ class Offline {
             }
             else if (integration === 'lambda-proxy') {
               event = createLambdaProxyContext(request, this.options, this.velocityContextOptions.stageVariables);
+              
+              let { mode, ctx, wss, ws, req, peers, initially } = request.websocket()
+              if (ws) {
+                event.requestContext.eventType = 'MESSAGE'
+              }
             }
 
             event.isOffline = true;

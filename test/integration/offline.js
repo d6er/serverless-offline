@@ -1,7 +1,5 @@
 /* global describe before context it */
 
-'use strict';
-
 const chai = require('chai');
 const dirtyChai = require('dirty-chai');
 const ServerlessBuilder = require('../support/ServerlessBuilder');
@@ -701,6 +699,97 @@ describe('Offline', () => {
         },
       }, res => {
         expect(res.statusCode).to.eq(200);
+        done();
+      });
+    });
+  });
+
+  context('check cookie status', () => {
+    it('check for isHttpOnly off', done => {
+      const offline = new OfflineBuilder().addFunctionHTTP('test', {
+        path: 'fn2',
+        method: 'GET',
+      }, (event, context, cb) => cb(null, { headers: { 'Set-Cookie': 'mycookie=123' } })).toObject();
+
+      offline.inject({
+        method: 'GET',
+        url: '/fn2',
+        headers: {
+        },
+      }, res => {
+        res.headers['set-cookie'].forEach(v => expect(v.match(/httponly/i)).to.eq(null));
+        done();
+      });
+    });
+    it('check for isSecure off', done => {
+      const offline = new OfflineBuilder().addFunctionHTTP('test', {
+        path: 'fn3',
+        method: 'GET',
+      }, (event, context, cb) => cb(null, { headers: { 'Set-Cookie': 'mycookie=123' } })).toObject();
+
+      offline.inject({
+        method: 'GET',
+        url: '/fn3',
+        headers: {
+        },
+      }, res => {
+        res.headers['set-cookie'].forEach(v => expect(v.match(/secure/i)).to.eq(null));
+        done();
+      });
+    });
+    it('check for isSameSite off', done => {
+      const offline = new OfflineBuilder().addFunctionHTTP('test', {
+        path: 'fn4',
+        method: 'GET',
+      }, (event, context, cb) => cb(null, { headers: { 'Set-Cookie': 'mycookie=123' } })).toObject();
+
+      offline.inject({
+        method: 'GET',
+        url: '/fn4',
+        headers: {
+        },
+      }, res => {
+        res.headers['set-cookie'].forEach(v => expect(v.match(/samesite/i)).to.eq(null));
+        done();
+      });
+    });
+  });
+
+  context('with resource routes', () => {
+    let serviceBuilder;
+    before(done => {
+      serviceBuilder = new ServerlessBuilder();
+      serviceBuilder.serverless.service.resources = {
+        Resources: {
+          EchoProxyResource: {
+            Type: 'AWS::ApiGateway::Resource',
+            Properties: {
+              PathPart: 'echo/{proxy+}',
+            },
+          },
+          EchoProxyMethod: {
+            Type: 'AWS::ApiGateway::Method',
+            Properties: {
+              ResourceId: {
+                Ref: 'EchoProxyResource',
+              },
+              HttpMethod: 'ANY',
+              Integration: {
+                IntegrationHttpMethod: 'ANY',
+                Type: 'HTTP_PROXY',
+                Uri: 'http://mockbin.org/request/{proxy}',
+              },
+            },
+          },
+        },
+      };
+      done();
+    });
+    it('proxies query strings', done => {
+      const offline = new OfflineBuilder(serviceBuilder, { resourceRoutes: true }).toObject();
+      offline.inject('/echo/foo?bar=baz').then(res => {
+        const result = JSON.parse(res.result);
+        expect(result.queryString).to.have.property('bar', 'baz');
         done();
       });
     });

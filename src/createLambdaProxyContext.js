@@ -1,5 +1,3 @@
-'use strict';
-
 const utils = require('./utils');
 const jwt = require('jsonwebtoken');
 
@@ -31,7 +29,7 @@ module.exports = function createLambdaProxyContext(request, options, stageVariab
       body = request.rawPayload;
     }
 
-    if (!headers['Content-Length'] && !headers['content-length'] && !headers['Content-length']) {
+    if (!headers['Content-Length'] && !headers['content-length'] && !headers['Content-length'] && (typeof body === 'string' || body instanceof Buffer || body instanceof ArrayBuffer)) {
       headers['Content-Length'] = Buffer.byteLength(body);
     }
 
@@ -80,14 +78,14 @@ module.exports = function createLambdaProxyContext(request, options, stageVariab
       stage: options.stage,
       requestId: `offlineContext_requestId_${utils.randomId()}`,
       identity: {
-        cognitoIdentityPoolId: 'offlineContext_cognitoIdentityPoolId',
-        accountId: 'offlineContext_accountId',
-        cognitoIdentityId: request.headers['cognito-identity-id'] || 'offlineContext_cognitoIdentityId',
-        caller: 'offlineContext_caller',
-        apiKey: 'offlineContext_apiKey',
+        cognitoIdentityPoolId: process.env.SLS_COGNITO_IDENTITY_POOL_ID || 'offlineContext_cognitoIdentityPoolId',
+        accountId: process.env.SLS_ACCOUNT_ID || 'offlineContext_accountId',
+        cognitoIdentityId: request.headers['cognito-identity-id'] || process.env.SLS_COGNITO_IDENTITY_ID || 'offlineContext_cognitoIdentityId',
+        caller: process.env.SLS_CALLER || 'offlineContext_caller',
+        apiKey: process.env.SLS_API_KEY || 'offlineContext_apiKey',
         sourceIp: request.info.remoteAddress,
-        cognitoAuthenticationType: 'offlineContext_cognitoAuthenticationType',
-        cognitoAuthenticationProvider: request.headers['cognito-authentication-provider'] || 'offlineContext_cognitoAuthenticationProvider',
+        cognitoAuthenticationType: process.env.SLS_COGNITO_AUTHENTICATION_TYPE || 'offlineContext_cognitoAuthenticationType',
+        cognitoAuthenticationProvider: request.headers['cognito-authentication-provider'] || process.env.SLS_COGNITO_AUTHENTICATION_PROVIDER || 'offlineContext_cognitoAuthenticationProvider',
         userArn: 'offlineContext_userArn',
         userAgent: request.headers['user-agent'] || '',
         user: 'offlineContext_user',

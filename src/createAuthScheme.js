@@ -1,15 +1,22 @@
-'use strict';
-
 const Boom = require('boom');
 
 const createLambdaContext = require('./createLambdaContext');
 const functionHelper = require('./functionHelper');
 const debugLog = require('./debugLog');
 const utils = require('./utils');
-const _ = require('lodash');
 const authCanExecuteResource = require('./authCanExecuteResource');
 
-module.exports = function createAuthScheme(authFun, authorizerOptions, funName, endpointPath, options, serverlessLog, servicePath, serverless) {
+function createAuthScheme(
+  authFun,
+  authorizerOptions,
+  funName,
+  endpointPath,
+  options, 
+  serverlessLog,
+  servicePath,
+  serviceRuntime,
+  serverless
+) {
   const authFunName = authorizerOptions.name;
 
   let identityHeader = 'authorization';
@@ -22,14 +29,12 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
     identityHeader = identitySourceMatch[1].toLowerCase();
   }
 
-  const funOptions = functionHelper.getFunctionOptions(authFun, funName, servicePath);
-
-  const serviceRuntime = serverless.service.provider.runtime;
+  const funOptions = functionHelper.getFunctionOptions(authFun, funName, servicePath, serviceRuntime);
 
   // Create Auth Scheme
   return () => ({
     authenticate(request, reply) {
-      process.env = _.extend({}, serverless.service.provider.environment, authFun.environment, process.env);
+      process.env = Object.assign({}, serverless.service.provider.environment, authFun.environment, process.env);
       console.log(''); // Just to make things a little pretty
       serverlessLog(`Running Authorization function for ${request.method} ${request.path} (λ: ${authFunName})`);
 
@@ -72,10 +77,13 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
       }
       else {
         const authorization = req.headers[identityHeader];
-        debugLog(`Retrieved ${identityHeader} header ${authorization}`);
+        
+        const matchedAuthorization = authorization && authorization.match(authorizerOptions.identityValidationExpression);
+        const finalAuthorization = (matchedAuthorization && matchedAuthorization[1]) || '';
+        debugLog(`Retrieved ${identityHeader} header ${finalAuthorization}`);
         event = {
           type: 'TOKEN',
-          authorizationToken: authorization,
+          authorizationToken: finalAuthorization,
         };
       }
 
@@ -93,7 +101,7 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
         requestId: 'random-request-id',
         resourcePath,
         httpMethod,
-        apiId
+        apiId,
       };
 
       // Create the Authorization function handler
@@ -167,10 +175,12 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
       const x = handler(event, lambdaContext, lambdaContext.done);
 
       // Promise support
-      if ((serviceRuntime === 'nodejs8.10' || serviceRuntime === 'babel') && !done) {
+      if (!done) {
         if (x && typeof x.then === 'function' && typeof x.catch === 'function') x.then(lambdaContext.succeed).catch(lambdaContext.fail);
         else if (x instanceof Error) lambdaContext.fail(x);
       }
     },
   });
-};
+}
+
+module.exports = createAuthScheme;
